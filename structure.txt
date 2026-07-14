@@ -1,0 +1,100 @@
+interview_backend/
+│
+├── app.js
+├── server.js
+├── package.json
+├── .env
+├── .gitignore
+│
+├── config/
+│   ├── db.js                 # Sequelize connection
+│   ├── razorpay.js           # Razorpay configuration
+│   ├── mail.js               # Nodemailer
+│   └── jwt.js                # JWT secret/config
+│
+├── middleware/
+│   ├── auth.js               # JWT verification
+│   ├── roleAuth.js           # Candidate/HR/Interviewer authorization
+│   ├── upload.js             # Multer configuration
+│   ├── validate.js           # Request validation
+│   └── errorHandler.js       # Global error handler
+│
+├── routes/
+│   └── index.js              # Registers all module routes
+│
+├── utils/
+│   ├── bcrypt.js
+│   ├── jwt.js
+│   ├── response.js
+│   ├── logger.js
+│   ├── email.js
+│   └── constants.js
+│
+├── candidate/
+│   ├── candidate.model.js
+│   ├── candidate.controller.js
+│   ├── candidate.service.js
+│   ├── candidate.routes.js
+│   └── candidate.validation.js
+│
+├── interviewer/
+│   ├── interviewer.model.js
+│   ├── interviewer.controller.js
+│   ├── interviewer.service.js
+│   ├── interviewer.routes.js
+│   └── interviewer.validation.js
+│
+├── hr/
+│   ├── hr.model.js
+│   ├── hr.controller.js
+│   ├── hr.service.js
+│   ├── hr.routes.js
+│   └── hr.validation.js
+│
+├── interview/
+│   ├── interview.model.js
+│   ├── interview.controller.js
+│   ├── interview.service.js
+│   ├── interview.routes.js
+│   └── interview.validation.js
+│
+├── payment/
+│   ├── payment.model.js
+│   ├── payment.controller.js
+│   ├── payment.service.js
+│   ├── payment.routes.js
+│   └── razorpayWebhook.js
+│
+├── transaction/
+│   ├── transaction.model.js
+│   ├── transaction.controller.js
+│   ├── transaction.service.js
+│   └── transaction.routes.js
+│
+├── notification/
+│   ├── notification.controller.js
+│   ├── notification.service.js
+│   └── notification.routes.js
+│
+├── upload/
+│   ├── upload.controller.js
+│   ├── upload.routes.js
+│   └── storage.js
+│
+├── dashboard/
+│   ├── dashboard.controller.js
+│   ├── dashboard.service.js
+│   └── dashboard.routes.js
+│
+├── migrations/
+│
+├── seeders/
+│
+├── uploads/
+│   ├── resumes/
+│   └── profile/
+│
+└── tests/
+    ├── candidate.test.js
+    ├── interview.test.js
+    └── payment.test.js
