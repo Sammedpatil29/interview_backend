@@ -16,7 +16,7 @@ const Candidate = sequelize.define('Candidate', {
 
     email: {
         type: DataTypes.STRING,
-        unique: true
+        unique: false
     },
 
     contact: DataTypes.STRING,
@@ -51,6 +51,9 @@ const Candidate = sequelize.define('Candidate', {
 
     profileUrl: DataTypes.STRING
 
+    // passwordResetToken: DataTypes.STRING,
+    // passwordResetExpires: DataTypes.DATE
+
 });
 
 Candidate.beforeCreate(async (candidate) => {
@@ -58,5 +61,12 @@ Candidate.beforeCreate(async (candidate) => {
     candidate.password = await hashPassword(candidate.password);
   }
 });
+
+Candidate.beforeUpdate(async (candidate) => {
+  if (candidate.changed('password')) {
+    candidate.password = await hashPassword(candidate.password);
+  }
+});
+
 
 module.exports = Candidate;

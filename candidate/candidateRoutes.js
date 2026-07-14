@@ -17,4 +17,11 @@ router.put('/:id', candidateController.updateCandidate);
 // DELETE /api/candidate/:id - Delete a candidate by ID
 router.delete('/:id', candidateController.deleteCandidate);
 
+router.post('/candidateLogin', candidateController.loginCandidate);
+
+// Forgot/Reset Password Routes
+router.post('/forgot-password', candidateController.forgotPassword);
+router.put('/reset-password/:token', candidateController.resetPassword);
+
+
 module.exports = router;

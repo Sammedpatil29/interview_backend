@@ -135,4 +135,82 @@ exports.loginCandidate = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: 'Server error during login', error: error.message });
   }
+
+};
+
+/**
+ * @description Generate and email a password reset token.
+ * @route POST /api/candidate/forgot-password
+ */
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const candidate = await Candidate.findOne({ where: { email } });
+
+    if (!candidate) {
+      // To prevent user enumeration, we send a success response even if the user doesn't exist.
+      return res.status(200).json({ message: 'If a user with that email exists, a password reset link has been sent.' });
+    }
+
+    // Generate a reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+
+    // Hash the token and set it on the candidate model
+    candidate.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    candidate.passwordResetExpires = Date.now() + 10 * 60 * 1000; // Token expires in 10 minutes
+
+    await candidate.save({ validate: false }); // Skip validation to save reset token fields
+
+    // Create reset URL and send email
+    const resetUrl = `${req.protocol}://${req.get('host')}/api/candidate/reset-password/${resetToken}`;
+    const message = `<p>You are receiving this email because you (or someone else) have requested the reset of a password. Please click on the following link, or paste this into your browser to complete the process:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>If you did not request this, please ignore this email and your password will remain unchanged.</p>`;
+
+    await sendEmail({
+      to: candidate.email,
+      subject: 'Password Reset Token',
+      html: message,
+    });
+
+    res.status(200).json({ message: 'A password reset link has been sent to your email.' });
+  } catch (error) {
+    // In case of error, clear the token fields to be safe
+    if (candidate) {
+      candidate.passwordResetToken = null;
+      candidate.passwordResetExpires = null;
+      await candidate.save({ validate: false });
+    }
+    res.status(500).json({ message: 'Error sending password reset email.', error: error.message });
+  }
+};
+
+/**
+ * @description Reset password using a token.
+ * @route PUT /api/candidate/reset-password/:token
+ */
+exports.resetPassword = async (req, res) => {
+  try {
+    // 1. Get user based on the token
+    const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+
+    const candidate = await Candidate.findOne({
+      where: {
+        passwordResetToken: hashedToken,
+        passwordResetExpires: { [require('sequelize').Op.gt]: Date.now() },
+      },
+    });
+
+    if (!candidate) {
+      return res.status(400).json({ message: 'Token is invalid or has expired.' });
+    }
+
+    // 2. Set the new password and clear the reset token fields
+    candidate.password = req.body.password;
+    candidate.passwordResetToken = null;
+    candidate.passwordResetExpires = null;
+    await candidate.save(); // The beforeUpdate hook will hash the new password
+
+    res.status(200).json({ message: 'Password has been reset successfully.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error resetting password.', error: error.message });
+  }
 };
