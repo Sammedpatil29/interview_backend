@@ -7,6 +7,8 @@ const sequelize = require('./db'); // Import the database configuration
 
 const candidateRoutes = require('./candidate/candidateRoutes');
 const interviewRoutes = require('./interviews/interviewRoutes');
+const hrRoutes = require('./hr/hrRoutes');
+const interviewerRoutes = require('./interviewer/interviewerRoutes');
 
 // Create an Express application
 const app = express();
@@ -28,6 +30,8 @@ app.use(cors());
 
 app.use('/api/candidate', candidateRoutes);
 app.use('/api/interview', interviewRoutes);
+app.use('/api/hr', hrRoutes);
+app.use('/api/interviewer', interviewerRoutes);
 
 // A simple route to check if the server is running
 app.get('/', (req, res) => {
