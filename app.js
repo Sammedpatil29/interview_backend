@@ -40,13 +40,67 @@ app.get('/', (req, res) => {
 
 // Connect to the database and start the server
 sequelize
-  .sync({ alter: true }) // Use { force: true } to drop and re-create tables. `alter: true` is safer.
-  .then(() => {
-    console.log('Database connected and models synchronized.');
+  .sync() // Creates tables if they don't exist, but won't alter them. This is safer.
+  .then(async () => {
+    console.log('Initial sync complete. Now running manual schema alterations...');
+
+    try {
+      // This query manually alters the column type, providing a `USING` clause
+      // to tell PostgreSQL how to cast the data from its old type to JSONB.
+      // It constructs a JSON object from the old numeric value.
+      const alterQuery = `
+        ALTER TABLE "Interviews" 
+        ALTER COLUMN "interviewerShare" TYPE JSONB 
+        USING jsonb_build_object('share', "interviewerShare"::numeric, 'approved', false);`;
+      await sequelize.query(alterQuery);
+      console.log('✅ Successfully altered "Interviews" table.');
+    } catch (alterErr) {
+      // We expect this to fail if the column is already the correct type,
+      // which is fine. We log a warning instead of crashing.
+      console.warn('⚠️  Alteration of "Interviews" table skipped (likely already up-to-date).');
+    }
+
+    try {
+      // Manually add the 'wallet' column to the 'Interviewers' table if it doesn't exist.
+      const alterInterviewerQuery = `
+        ALTER TABLE "Interviewers" 
+        ADD COLUMN IF NOT EXISTS "wallet" JSONB DEFAULT '{"balance": 0, "pending": 0, "withdrawn": 0}'::jsonb;`;
+      await sequelize.query(alterInterviewerQuery);
+      console.log('✅ Successfully altered "Interviewers" table.');
+    } catch (alterErr) {
+      // This will likely fail if the column already exists, which is fine.
+      console.warn('⚠️  Alteration of "Interviewers" table skipped (likely already up-to-date).');
+    }
+
+    try {
+      // Manually add the 'feedback' column to the 'Interviews' table if it doesn't exist.
+      const alterInterviewQuery = `
+        ALTER TABLE "Interviews" 
+        ADD COLUMN IF NOT EXISTS "feedback" JSONB;`;
+      await sequelize.query(alterInterviewQuery);
+      console.log('✅ Successfully altered "Interviews" table to add feedback column.');
+    } catch (alterErr) {
+      console.warn('⚠️  Alteration of "Interviews" table for feedback column skipped (likely already up-to-date).');
+    }
+
+    try {
+      // Manually add the 'upi' column to the 'Interviewers' table if it doesn't exist.
+      const alterInterviewerUpiQuery = `
+        ALTER TABLE "Interviewers" 
+        ADD COLUMN IF NOT EXISTS "upi" VARCHAR(255);`;
+      await sequelize.query(alterInterviewerUpiQuery);
+      console.log('✅ Successfully altered "Interviewers" table to add upi column.');
+    } catch (alterErr) {
+      console.warn('⚠️  Alteration of "Interviewers" table for upi column skipped (likely already up-to-date).');
+    }
+
+    // You can add more manual ALTER queries here in the future.
+
+    console.log('Database connected and schema is up-to-date.');
     app.listen(port, () => {
       console.log(`Server is running on http://localhost:${port}`);
     });
   })
-  .catch(err => {
-    console.error('Unable to connect to the database:', err);
+  .catch((err) => {
+    console.error('❌ Unable to connect to the database or perform sync:', err);
   });

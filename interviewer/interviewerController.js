@@ -107,3 +107,57 @@ exports.loginInterviewer = async (req, res) => {
     res.status(500).json({ message: 'Server error during login', error: error.message });
   }
 };
+
+/**
+ * @description Get wallet and transaction details for the logged-in interviewer.
+ * @route GET /api/interviewer/wallet
+ */
+exports.getWalletDetails = async (req, res) => {
+  try {
+    const { id, role } = req.user; // Decoded from auth token
+
+    // Ensure the user is an interviewer
+    if (role !== 'interviewer') {
+      return res.status(403).json({ message: 'Forbidden: Access is restricted to interviewers.' });
+    }
+
+    const interviewer = await Interviewer.findByPk(id, {
+      attributes: ['wallet', 'transactions'],
+    });
+
+    if (!interviewer) {
+      return res.status(404).json({ message: 'Interviewer not found.' });
+    }
+
+    res.status(200).json(interviewer);
+  } catch (error) {
+    res.status(500).json({ message: 'Error retrieving wallet details', error: error.message });
+  }
+};
+
+/**
+ * @description Get UPI ID for the logged-in interviewer.
+ * @route GET /api/interviewer/upi
+ */
+exports.getUpi = async (req, res) => {
+  try {
+    const { id, role } = req.user; // Decoded from auth token
+
+    // Ensure the user is an interviewer
+    if (role !== 'interviewer') {
+      return res.status(403).json({ message: 'Forbidden: Access is restricted to interviewers.' });
+    }
+
+    const interviewer = await Interviewer.findByPk(id, {
+      attributes: ['upi'],
+    });
+
+    if (!interviewer) {
+      return res.status(404).json({ message: 'Interviewer not found.' });
+    }
+
+    res.status(200).json({ upi: interviewer.upi });
+  } catch (error) {
+    res.status(500).json({ message: 'Error retrieving UPI details', error: error.message });
+  }
+};

@@ -31,7 +31,15 @@ const Interviewer = sequelize.define('Interviewer', {
     type: DataTypes.JSONB,
     defaultValue: [],
   },
+  wallet: {
+    type: DataTypes.JSONB,
+    defaultValue: { balance: 0, pending: 0, withdrawn: 0 },
+  },
   profileUrl: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  upi: {
     type: DataTypes.STRING,
     allowNull: true,
   },

@@ -52,6 +52,10 @@ const Interview = sequelize.define('Interview', {
     type: DataTypes.JSONB,
     allowNull: true,
   },
+  feedback: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+  },
   payment: {
     type: DataTypes.ENUM('paid', 'pending', 'failed'),
     defaultValue: 'pending',
@@ -61,7 +65,7 @@ const Interview = sequelize.define('Interview', {
     allowNull: true,
   },
   interviewerShare: {
-    type: DataTypes.DECIMAL(10, 2),
+    type: DataTypes.JSONB,
     allowNull: true,
   },
   timeline: {

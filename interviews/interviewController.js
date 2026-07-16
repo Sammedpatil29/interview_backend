@@ -1,5 +1,7 @@
 const Interview = require('./interviewModel');
 const Candidate = require('../candidate/candidateModel');
+const Interviewer = require('../interviewer/interviewerModel');
+const sequelize = require('../db');
 const sendEmail = require('../utils/email');
 const crypto = require('crypto');
 
@@ -9,7 +11,7 @@ const crypto = require('crypto');
  */
 exports.createInterview = async (req, res) => {
   try {
-    const { mobileNumber, candidateEmail, candidateName, skills, type } = req.body;
+    const { mobileNumber, candidateEmail, candidateName, skills, type, amount } = req.body;
 
     // Find an existing candidate or create a new one
     let candidate = await Candidate.findOne({ where: { contact: mobileNumber } });
@@ -43,6 +45,15 @@ exports.createInterview = async (req, res) => {
 
     // Create the interview and link it to the candidate
     const interviewData = { ...req.body, candidateId: candidate.id };
+
+    // Calculate and set the interviewer's share
+    if (amount && !isNaN(parseFloat(amount))) {
+      interviewData.interviewerShare = {
+        share: parseFloat(amount) * 0.3,
+        approved: false,
+      };
+    }
+
     const interview = await Interview.create(interviewData);
 
     res.status(201).json({ message: 'New interview created!', data: interview });
@@ -251,5 +262,113 @@ exports.deleteInterview = async (req, res) => {
     res.status(204).send();
   } catch (error) {
     res.status(500).json({ message: 'Error deleting interview', error: error.message });
+  }
+};
+
+/**
+ * @description Get interviews that are complete and pending interviewer payment approval.
+ * @route GET /api/interview/pending-approvals
+ */
+exports.getPendingApprovals = async (req, res) => {
+  try {
+    // This is an admin/finance task, so we should check the user's role.
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Forbidden: You do not have permission to perform this action.' });
+    }
+
+    const { Op } = require('sequelize');
+    const pendingInterviews = await Interview.findAll({
+      where: {
+        // Find interviews where the interviewerShare object exists...
+        [Op.and]: [
+          { interviewerShare: { [Op.ne]: null } },
+          // ...and the 'approved' flag within that JSONB object is false.
+          sequelize.literal(`("interviewerShare"->>'approved')::boolean = false`),
+          // ...and the last timeline status is 'Completed'.
+          sequelize.literal(`("timeline" -> -1 ->> 'status') = 'Completed'`),
+        ],
+      },
+    });
+
+    res.status(200).json(pendingInterviews);
+  } catch (error) {
+    res.status(500).json({ message: 'Error retrieving interviews pending approval', error: error.message });
+  }
+};
+
+/**
+ * @description Approve interviewer share, and add a transaction record to the interviewer.
+ * @route PUT /api/interview/:id/approve-share
+ */
+exports.approveInterviewerShare = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  try {
+    // Ensure the user is an admin
+    if (req.user.role !== 'admin') {
+      await transaction.rollback();
+      return res.status(403).json({ message: 'Forbidden: You do not have permission to perform this action.' });
+    }
+
+    const interviewId = req.params.id;
+    const interview = await Interview.findByPk(interviewId, { transaction });
+
+    if (!interview) {
+      await transaction.rollback();
+      return res.status(404).json({ message: 'Interview not found.' });
+    }
+
+    if (!interview.interviewer || !interview.interviewerShare) {
+      await transaction.rollback();
+      return res.status(400).json({ message: 'Interview has no interviewer or share amount to approve.' });
+    }
+
+    if (interview.interviewerShare.approved) {
+      await transaction.rollback();
+      return res.status(400).json({ message: 'This interviewer share has already been approved.' });
+    }
+
+    const interviewer = await Interviewer.findByPk(interview.interviewer.id, { transaction });
+
+    if (!interviewer) {
+      await transaction.rollback();
+      return res.status(404).json({ message: 'Associated interviewer not found.' });
+    }
+
+    // 1. Update the Interview: Mark share as approved and add a timeline event
+    const updatedShare = { ...interview.interviewerShare, approved: true };
+    const newTimelineEvent = {
+      date: new Date(),
+      status: 'Payment Approved',
+      comment: `Interviewer share of ${updatedShare.share} approved by admin.`,
+    };
+    interview.interviewerShare = updatedShare;
+    // interview.timeline = [...interview.timeline, newTimelineEvent];
+    await interview.save({ transaction });
+
+    // 2. Update the Interviewer's wallet and transaction history
+    const shareAmount = parseFloat(updatedShare.share);
+    const currentWallet = interviewer.wallet || { balance: 0, pending: 0, withdrawn: 0 };
+
+    const newTransaction = {
+      date: new Date().toISOString(),
+      amount: shareAmount,
+      type: 'credit',
+      comment: `Payment for interview with ${interview.candidateName} (Interview ID: ${interview.id})`,
+    };
+
+    // Update wallet balance and add the new transaction to its history
+    const newBalance = (parseFloat(currentWallet.balance) || 0) + shareAmount;
+    interviewer.set('wallet', { ...currentWallet, balance: newBalance });
+
+    interviewer.transactions = [...interviewer.transactions, newTransaction];
+    await interviewer.save({ transaction });
+
+    // If all goes well, commit the transaction
+    await transaction.commit();
+
+    res.status(200).json({ message: 'Interviewer share approved successfully.' });
+  } catch (error) {
+    await transaction.rollback();
+    res.status(500).json({ message: 'Error approving interviewer share', error: error.message });
   }
 };
