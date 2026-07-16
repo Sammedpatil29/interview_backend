@@ -9,6 +9,7 @@ const candidateRoutes = require('./candidate/candidateRoutes');
 const interviewRoutes = require('./interviews/interviewRoutes');
 const hrRoutes = require('./hr/hrRoutes');
 const interviewerRoutes = require('./interviewer/interviewerRoutes');
+const payoutRoutes = require('./payout/payoutRoutes');
 
 // Create an Express application
 const app = express();
@@ -32,6 +33,7 @@ app.use('/api/candidate', candidateRoutes);
 app.use('/api/interview', interviewRoutes);
 app.use('/api/hr', hrRoutes);
 app.use('/api/interviewer', interviewerRoutes);
+app.use('/api/payout', payoutRoutes);
 
 // A simple route to check if the server is running
 app.get('/', (req, res) => {
@@ -93,6 +95,10 @@ sequelize
     } catch (alterErr) {
       console.warn('⚠️  Alteration of "Interviewers" table for upi column skipped (likely already up-to-date).');
     }
+
+    // The basic .sync() will create the Payouts table if it doesn't exist,
+    // as it's a new model. No manual ALTER is needed for creation.
+    console.log('✅ Payout model synced.');
 
     // You can add more manual ALTER queries here in the future.
 
