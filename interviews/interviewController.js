@@ -372,3 +372,70 @@ exports.approveInterviewerShare = async (req, res) => {
     res.status(500).json({ message: 'Error approving interviewer share', error: error.message });
   }
 };
+
+/**
+ * @description Autosave feedback for an interview.
+ * @route PUT /api/interview/:id/feedback
+ */
+exports.autosaveFeedback = async (req, res) => {
+  try {
+    const { id: interviewId } = req.params;
+    const { feedback } = req.body;
+    const { id: userId, role } = req.user;
+
+    const interview = await Interview.findByPk(interviewId);
+
+    if (!interview) {
+      return res.status(404).json({ message: 'Interview not found' });
+    }
+
+    // Security check: Only the assigned interviewer or an admin can submit feedback.
+    if (role !== 'admin' && (!interview.interviewer || interview.interviewer.id !== userId)) {
+      return res.status(403).json({ message: 'Forbidden: You do not have permission to submit feedback for this interview.' });
+    }
+
+    await interview.update({ feedback });
+
+    res.status(200).json({ message: 'Feedback saved successfully.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error saving feedback', error: error.message });
+  }
+};
+
+/**
+ * @description Submit final feedback for an interview, update timeline, and notify candidate.
+ * @route POST /api/interview/:id/feedback
+ */
+exports.submitFeedback = async (req, res) => {
+  try {
+    const { id: interviewId } = req.params;
+    const { feedback } = req.body;
+    const { id: userId, role, name: userName } = req.user;
+
+    const interview = await Interview.findByPk(interviewId);
+
+    if (!interview) {
+      return res.status(404).json({ message: 'Interview not found' });
+    }
+
+    // Security check: Only the assigned interviewer or an admin can submit feedback.
+    if (role !== 'admin' && (!interview.interviewer || interview.interviewer.id !== userId)) {
+      return res.status(403).json({ message: 'Forbidden: You do not have permission to submit feedback for this interview.' });
+    }
+
+    const newTimelineEvent = {
+      date: new Date(),
+      status: 'Feedback Added',
+      comment: `Feedback submitted by ${userName}.`,
+    };
+
+    await interview.update({
+      feedback,
+      timeline: [...interview.timeline, newTimelineEvent],
+    });
+
+    res.status(200).json({ message: 'Feedback submitted successfully.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error submitting feedback', error: error.message });
+  }
+};

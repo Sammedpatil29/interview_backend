@@ -21,6 +21,14 @@ router.put('/:id', auth, interviewController.updateInterview);
 // Approve an interviewer's share for an interview
 router.put('/:id/approve-share', auth, interviewController.approveInterviewerShare);
 
+// Submit final feedback for an interview
+router.put('/:id/feedback', auth, interviewController.submitFeedback);
+
+// Autosave feedback for an interview
+router.put('/:id/auto-save-feedback', auth, interviewController.autosaveFeedback);
+
+
+
 // Delete an interview by ID
 router.delete('/:id', auth, interviewController.deleteInterview);
 
