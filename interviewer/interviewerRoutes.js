@@ -4,7 +4,7 @@ const interviewerController = require('./interviewerController');
 const auth = require('../middlewares/auth');
 
 router.post('/login', interviewerController.loginInterviewer);
-router.post('/', auth, interviewerController.createInterviewer);
+router.post('/', interviewerController.createInterviewer);
 router.get('/', auth, interviewerController.getAllInterviewers);
 
 // Get wallet details for the logged-in interviewer

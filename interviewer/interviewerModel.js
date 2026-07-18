@@ -39,6 +39,21 @@ const Interviewer = sequelize.define('Interviewer', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  linkedinUrl: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    validate: {
+      isUrl: {
+        msg: 'Please enter a valid LinkedIn URL.',
+        // This allows the field to be null or empty without triggering the URL validation.
+      },
+    },
+  },
+  status: {
+    type: DataTypes.ENUM('active', 'inactive'),
+    defaultValue: 'active',
+    allowNull: false,
+  },
   upi: {
     type: DataTypes.STRING,
     allowNull: true,

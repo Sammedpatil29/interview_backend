@@ -96,6 +96,35 @@ sequelize
       console.warn('⚠️  Alteration of "Interviewers" table for upi column skipped (likely already up-to-date).');
     }
 
+    try {
+      // Manually add the 'linkedinUrl' column to the 'Interviewers' table if it doesn't exist.
+      const alterInterviewerLinkedinQuery = `
+        ALTER TABLE "Interviewers" 
+        ADD COLUMN IF NOT EXISTS "linkedinUrl" VARCHAR(255);`;
+      await sequelize.query(alterInterviewerLinkedinQuery);
+      console.log('✅ Successfully altered "Interviewers" table to add linkedinUrl column.');
+    } catch (alterErr) {
+      console.warn('⚠️  Alteration of "Interviewers" table for linkedinUrl column skipped (likely already up-to-date).');
+    }
+
+    try {
+      // Manually create the ENUM type for status if it doesn't exist, then add the column.
+      const alterInterviewerStatusQuery = `
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_Interviewers_status') THEN
+                CREATE TYPE "enum_Interviewers_status" AS ENUM('active', 'inactive');
+            END IF;
+        END
+        $$;
+        ALTER TABLE "Interviewers" 
+        ADD COLUMN IF NOT EXISTS "status" "enum_Interviewers_status" NOT NULL DEFAULT 'active';`;
+      await sequelize.query(alterInterviewerStatusQuery);
+      console.log('✅ Successfully altered "Interviewers" table to add status column.');
+    } catch (alterErr) {
+      console.warn('⚠️  Alteration of "Interviewers" table for status column skipped (likely already up-to-date).');
+    }
+
     // The basic .sync() will create the Payouts table if it doesn't exist,
     // as it's a new model. No manual ALTER is needed for creation.
     console.log('✅ Payout model synced.');
