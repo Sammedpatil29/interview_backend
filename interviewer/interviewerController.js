@@ -182,6 +182,29 @@ exports.loginInterviewer = async (req, res) => {
 };
 
 /**
+ * @description Get all inactive interviewers (Admin/HR only)
+ * @route GET /api/interviewer/inactive
+ */
+exports.getInactiveInterviewers = async (req, res) => {
+  try {
+    const { role } = req.user;
+
+    // Only admin and HR can access this list
+    if (role !== 'admin' && role !== 'hr') {
+      return res.status(403).json({ message: 'Forbidden: You do not have permission to access this resource.' });
+    }
+
+    const inactiveInterviewers = await Interviewer.findAll({
+      where: { status: 'inactive' },
+      attributes: { exclude: ['password'] },
+    });
+
+    res.status(200).json(inactiveInterviewers);
+  } catch (error) {
+    res.status(500).json({ message: 'Error retrieving inactive interviewers', error: error.message });
+  }
+};
+/**
  * @description Get wallet and transaction details for the logged-in interviewer.
  * @route GET /api/interviewer/wallet
  */
