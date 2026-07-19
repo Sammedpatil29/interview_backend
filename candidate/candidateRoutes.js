@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const candidateController = require('./candidateController');
+const auth = require('../middlewares/auth');
 
 // POST /api/candidate - Create a new candidate
 router.post('/', candidateController.createCandidate);

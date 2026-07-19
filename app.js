@@ -10,6 +10,7 @@ const interviewRoutes = require('./interviews/interviewRoutes');
 const hrRoutes = require('./hr/hrRoutes');
 const interviewerRoutes = require('./interviewer/interviewerRoutes');
 const payoutRoutes = require('./payout/payoutRoutes');
+const dashboardRoutes = require('./dashboard/dashboardRoutes');
 
 // Create an Express application
 const app = express();
@@ -34,6 +35,7 @@ app.use('/api/interview', interviewRoutes);
 app.use('/api/hr', hrRoutes);
 app.use('/api/interviewer', interviewerRoutes);
 app.use('/api/payout', payoutRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // A simple route to check if the server is running
 app.get('/', (req, res) => {
