@@ -87,6 +87,10 @@ const Interview = sequelize.define('Interview', {
       key: 'id',
     },
   },
+  razorpayOrderId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
 });
 
 module.exports = Interview;

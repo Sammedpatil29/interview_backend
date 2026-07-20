@@ -27,7 +27,8 @@ router.put('/:id/feedback', auth, interviewController.submitFeedback);
 // Autosave feedback for an interview
 router.put('/:id/auto-save-feedback', auth, interviewController.autosaveFeedback);
 
-
+// Verify payment for an interview
+router.post('/:id/verify-payment', interviewController.verifyPayment);
 
 // Delete an interview by ID
 router.delete('/:id', auth, interviewController.deleteInterview);

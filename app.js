@@ -88,6 +88,17 @@ sequelize
     }
 
     try {
+      // Manually add the 'razorpayOrderId' column to the 'Interviews' table if it doesn't exist.
+      const alterInterviewRazorpayQuery = `
+        ALTER TABLE "Interviews" 
+        ADD COLUMN IF NOT EXISTS "razorpayOrderId" VARCHAR(255);`;
+      await sequelize.query(alterInterviewRazorpayQuery);
+      console.log('✅ Successfully altered "Interviews" table to add razorpayOrderId column.');
+    } catch (alterErr) {
+      console.warn('⚠️  Alteration of "Interviews" table for razorpayOrderId column skipped (likely already up-to-date).');
+    }
+
+    try {
       // Manually add the 'upi' column to the 'Interviewers' table if it doesn't exist.
       const alterInterviewerUpiQuery = `
         ALTER TABLE "Interviewers" 

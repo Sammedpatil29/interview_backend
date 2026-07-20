@@ -4,6 +4,12 @@ const Interviewer = require('../interviewer/interviewerModel');
 const sequelize = require('../db');
 const sendEmail = require('../utils/email');
 const crypto = require('crypto');
+const Razorpay = require('razorpay');
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 /**
  * @description Create a new interview
@@ -11,7 +17,7 @@ const crypto = require('crypto');
  */
 exports.createInterview = async (req, res) => {
   try {
-    const { mobileNumber, candidateEmail, candidateName, skills, type, amount } = req.body;
+    const { mobileNumber, candidateEmail, candidateName, skills, type, amount, experienceLevel } = req.body;
 
     // Find an existing candidate or create a new one
     let candidate = await Candidate.findOne({ where: { contact: mobileNumber } });
@@ -20,12 +26,13 @@ exports.createInterview = async (req, res) => {
       // If candidate doesn't exist, create one
       const generatedPassword = crypto.randomBytes(8).toString('hex');
 
+      // Pass all relevant fields from the interview request to the new candidate
       candidate = await Candidate.create({
         name: candidateName,
         email: candidateEmail,
         contact: mobileNumber,
         skills,
-        type,
+        type: experienceLevel,
         password: generatedPassword, // This will be hashed by the model's beforeCreate hook
       });
 
@@ -56,9 +63,29 @@ exports.createInterview = async (req, res) => {
 
     const interview = await Interview.create(interviewData);
 
+    // If an amount is present, create a Razorpay order
+    if (interview.amount && parseFloat(interview.amount) > 0) {
+      const orderOptions = {
+        amount: parseFloat(interview.amount) * 100, // amount in the smallest currency unit (paise)
+        currency: 'INR',
+        receipt: `interview_${interview.id}`,
+        notes: {
+          interviewId: interview.id,
+          candidateName: interview.candidateName,
+        },
+      };
+
+      const razorpayOrder = await razorpay.orders.create(orderOptions);
+
+      // Save the Razorpay order ID to the interview
+      interview.razorpayOrderId = razorpayOrder.id;
+      await interview.save();
+    }
+
     res.status(201).json({ message: 'New interview created!', data: interview });
   } catch (error) {
-    res.status(400).json({ message: 'Error creating interview', error: error.message });
+    console.error('Error during interview creation:', error);
+    res.status(400).json({ message: 'Error creating interview', error: error.message, ...(error.error && { razorpayError: error.error }) });
   }
 };
 
@@ -437,5 +464,94 @@ exports.submitFeedback = async (req, res) => {
     res.status(200).json({ message: 'Feedback submitted successfully.' });
   } catch (error) {
     res.status(500).json({ message: 'Error submitting feedback', error: error.message });
+  }
+};
+
+/**
+ * @description Verify a Razorpay payment and update the interview status.
+ * @route POST /api/interview/:id/verify-payment
+ */
+exports.verifyPayment = async (req, res) => {
+  const { id: interviewId } = req.params;
+  const { razorpay_order_id, razorpay_payment_id } = req.body;
+
+  const MAX_ATTEMPTS =15;
+  const POLLING_INTERVAL = 3000; // 5 seconds
+  let attempt = 0;
+
+  try {
+    const interview = await Interview.findByPk(interviewId);
+
+    if (!interview) {
+      return res.status(404).json({ message: 'Interview not found.' });
+    }
+
+    if (interview.payment === 'paid') {
+      return res.status(400).json({ message: 'Payment has already been verified for this interview.' });
+    }
+
+    const pollForPaymentStatus = async (resolve, reject) => {
+      attempt++;
+      try {
+        const orderPayments = await razorpay.orders.fetchPayments(razorpay_order_id);
+        const paymentAttempt = orderPayments.items.find(p => p.id === razorpay_payment_id);
+
+        if (paymentAttempt && paymentAttempt.status === 'captured') {
+          // Payment is captured, proceed with success logic
+          interview.payment = 'paid';
+
+          const newTimelineEvent = {
+            date: new Date(),
+            status: 'Payment Successful',
+            comment: `Payment of ${interview.amount} received. Payment ID: ${razorpay_payment_id}`,
+          };
+          interview.timeline = [...interview.timeline, newTimelineEvent];
+
+          await interview.save();
+
+          // Send confirmation email to candidate
+          try {
+            await sendEmail({
+              to: interview.candidateEmail,
+              subject: 'Payment Confirmation for Your Interview',
+              html: `<p>Hello ${interview.candidateName},</p>
+                     <p>We have successfully received your payment of INR ${interview.amount}.</p>
+                     <p>Our team will now proceed with scheduling your interview. You will receive further communication from us shortly.</p>
+                     <p>Best regards,</p>
+                     <p>The Hiring Team</p>`,
+            });
+          } catch (emailError) {
+            console.error(`Email sending failed for interview ${interview.id} after successful payment:`, emailError);
+          }
+          return resolve({ status: 200, body: { message: 'Payment verified successfully.' } });
+        } else if (paymentAttempt && paymentAttempt.status === 'failed') {
+          // Payment has failed, stop polling and update DB
+          interview.payment = 'failed';
+          const newTimelineEvent = {
+            date: new Date(),
+            status: 'Payment Failed',
+            comment: `Payment attempt failed. Reason: ${paymentAttempt.error_description || 'Unknown'}. Payment ID: ${razorpay_payment_id}`,
+          };
+          interview.timeline = [...interview.timeline, newTimelineEvent];
+          await interview.save();
+
+          return resolve({ status: 400, body: { message: 'Payment failed.', error: paymentAttempt.error_description } });
+        } else if (attempt < MAX_ATTEMPTS) {
+          // Payment not captured yet, poll again
+          setTimeout(() => pollForPaymentStatus(resolve, reject), POLLING_INTERVAL);
+        } else {
+          // Max attempts reached, payment not captured
+          return resolve({ status: 400, body: { message: 'Payment verification failed. Status is not "captured".' } });
+        }
+      } catch (error) {
+        return reject(error);
+      }
+    };
+
+    const result = await new Promise(pollForPaymentStatus);
+    res.status(result.status).json(result.body);
+
+  } catch (error) {
+    res.status(500).json({ message: 'Error verifying payment', error: error.message });
   }
 };
